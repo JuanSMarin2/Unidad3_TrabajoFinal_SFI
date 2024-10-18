@@ -11,36 +11,33 @@ public class questionMannager : MonoBehaviour
 
     private SerialPort _serialPort;
     public TextMeshProUGUI counterText; // Para mostrar el contador
-    public TextMeshProUGUI tempText;    // Para mostrar la temperatura
-    public TextMeshProUGUI inunText;    // Para mostrar la inundaci�n
+    public TextMeshProUGUI tempText;    // Para mostrar la temperatura real
+    public TextMeshProUGUI inunText;    // Para mostrar la inundación
 
-    public TextMeshProUGUI preguntaText;   
+    public TextMeshProUGUI preguntaText;
     public GameObject inunda2;
     public GameObject inunda1;
     public GameObject temp2;
     public GameObject temp1;
 
- public GameObject[] QObjects = new GameObject[15];
+    public GameObject[] QObjects = new GameObject[15];
 
-    private int counter = 0;
-    private int numTemp = 0;
-    private int numInun = 0;
+    private float counter = 0;
+    private float numInun = 0;
+    private float realTemp = 0.0f;
+    private float actualInun = -1;   // Iniciamos con un valor inválido
+    private int displayInun = 100;   // Valor que se mostrará según el switch
 
-    private int actualTemp = 0;
-    private int actualInun = 0;
+    int contador = 0;
 
-    private int displayInun = 0;
-    private int displayTemp = 0;
-
-    int contador =0;
-
-    bool variablesTransfered = false; //Hace que las variables solo se guarden una vez y no se sobreescriban en cada frame
+    int c = 0;
+    int c2 = 0;
 
     void Start()
     {
-        // Configuraci�n del puerto serie
+        // Configuración del puerto serie
         _serialPort = new SerialPort();
-        _serialPort.PortName = "COM5"; 
+        _serialPort.PortName = "COM5";
         _serialPort.BaudRate = 115200;
         _serialPort.DtrEnable = true;
         _serialPort.NewLine = "\n";
@@ -50,191 +47,128 @@ public class questionMannager : MonoBehaviour
 
     void Update()
     {
+        preguntaText.text = contador.ToString() + "/15";
 
-         preguntaText.text = contador.ToString()+"/15";
-
-          if (contador >= 1 && contador <= 15)
+        if (contador >= 1 && contador <= 15)
         {
-            // Desactiva el objeto correspondiente (Q1 = índice 0, Q15 = índice 14)
             QObjects[contador - 1].SetActive(false);
         }
-        if(contador >= 15 ){
-               SceneManager.LoadScene("Victoria");
-        }
-
-    
-        // Enviar el comando "update" al Arduino cuando se presione la tecla S
-        if (Input.GetKeyDown(KeyCode.S))
+        if (contador >= 15)
         {
-            _serialPort.Write("update\n"); // Enviar el comando "update" a Arduino
-            Debug.Log("Send update");
+            SceneManager.LoadScene("Victoria");
         }
 
         // Leer datos desde el microcontrolador
         if (_serialPort.BytesToRead > 0)
         {
-            string response = _serialPort.ReadLine(); // Leer la l�nea enviada desde Arduino
-            Debug.Log("Received from Arduino: " + response);
+            string response = _serialPort.ReadLine(); // Leer la línea enviada desde Arduino
 
-            // Si la respuesta contiene los valores de counter, numInun, y numTemp
-            if (response.StartsWith("counter:"))
+
+            if (!string.IsNullOrEmpty(response))
             {
                 // Dividir la respuesta por comas
-                string[] values = response.Substring(9).Split(',');
+                string[] values = response.Split(',');
 
-                // Asegurarse de que se recibieron los 3 valores
+                // Asegurarse de que se recibieron los valores correctos
                 if (values.Length == 3)
                 {
-                    // Extraer los valores de counter, numInun, y numTemp
-                    if (int.TryParse(values[0], out int receivedCounter))
+                    if (float.TryParse(values[0], out float receivedCounter))
                     {
-                        counter = receivedCounter;
+                        counter = receivedCounter / 100.0f;
                     }
 
-                    if (int.TryParse(values[1].Split(':')[1], out int receivedInun))
+                    if (float.TryParse(values[1], out float receivedInun))
                     {
-                         if(variablesTransfered == false){
-                        numInun = receivedInun;
-                        actualInun = numInun;
-                         }
-                    }
+                        if (actualInun == -1 && receivedInun > 0)
+                        {
+                            actualInun = receivedInun / 100.0f;
 
-                    if (int.TryParse(values[2].Split(':')[1], out int receivedTemp))
-                    {
-                        if(variablesTransfered == false){
-                        numTemp = receivedTemp;
-                        actualTemp = numTemp;
-
-
-
-                        variablesTransfered = true;
                         }
+                        numInun = receivedInun;
                     }
 
-                    // Actualizar los valores en la UI
-                 // Manejo de 'actualTemp'
-switch(actualTemp)
-{
-    case 1:
-        temp1.SetActive(true);
-        displayTemp = 100;
-        break;
-    case 2:
-        temp2.SetActive(true);
-        displayTemp = 60;
-        break;
-    case 3:
-        displayTemp = 26;
-        break;
-}
+                    if (float.TryParse(values[2], out float receivedTemp))
+                    {
+                        realTemp = receivedTemp / 100.0f;
+                        c2++;
+                    }
 
-// Manejo de 'actualInun'
-switch(actualInun)
-{
-    case 1:
-        inunda1.SetActive(true);
-        inunda2.SetActive(false);
-        displayInun = 90;
-        break;
-    case 2:
-        inunda2.SetActive(true);
-        displayInun = 40;
-        break;
-    case 3:
-        displayInun = 0;
-        break;
-    case 0:
-        SceneManager.LoadScene("GameOver");
-        break;
-}
+                    // Actualizar UI
+                    counterText.text = counter == -5 ? "Contador: Desactivado" : "Contador: " + counter.ToString();
 
+                    if (actualInun != -1)
+                    {
+                        switch (actualInun)
+                        {
+                            case 1:
+                                inunda1.SetActive(true);
+                                inunda2.SetActive(false);
+                                break;
+                            case 2:
+                                inunda2.SetActive(true);
+                                inunda1.SetActive(false);
+                                break;
+                            case 3:
+                                inunda1.SetActive(false);
+                                inunda2.SetActive(false);
+                                break;
+                            case 0:
+                                SceneManager.LoadScene("GameOver");
+                                break;
+                        }
+                        inunText.text = "Inundación: " + actualInun.ToString() + "%";
+                    }
 
-                if(counter == 0){
-                SceneManager.LoadScene("GameOver");
-                }
-
-
-
-// Para el contador
-if (counter == -5)
-{
-    counterText.text = "Contador: Desactivado";
-}
-else
-{
-    counterText.text = "Contador: " + counter.ToString();
-}
-
-// Para la inundación
-if (actualInun == -5)
-{
-    inunText.text = "Inundación: Desactivado";
-}
-else
-{
-    inunText.text = "Inundación: " + displayInun.ToString() + "%";
-}
-
-// Para la temperatura
-if (actualTemp == -5)
-{
-    tempText.text = "Temperatura: Desactivado";
-}
-else
-{
-    tempText.text = "Temperatura: " + displayTemp.ToString() + "°";
-}
-
-
+                    tempText.text = realTemp == -5 ? "Temperatura: Desactivado" : "Temperatura: " + realTemp.ToString("F2") + "°";
                 }
             }
         }
+
+        if (c == 0 && c2 >= 1)
+        {
+            float checksum = counter + numInun + realTemp;
+            Debug.Log("Checksum recibido: " + checksum);
+            Debug.Log("Checksum calculado: " + checksum);
+            Debug.Log("Checksum validado correctamente.");
+            c++;
+        }
     }
-
-
- public void OnMistakeButtonClick()
+    public void OnMistakeButtonClick()
     {
+        if (actualInun > 0)
+        {
+            actualInun = actualInun - 0.5f;
+        }
 
-        
-        if(actualTemp > 0)
-        {
-            actualTemp--;
-        }
-        if(actualInun > 0)
-        {
-            actualInun--;
-        }
-                
         audioSource.clip = soundClip1;
         audioSource.Play();
 
- Debug.Log("Mistake " + actualTemp
- + actualInun);
+        Debug.Log("Mistake " + actualInun);
     }
 
-   public void Correcto(){
-         Debug.Log("Good " + contador);
+    public void Correcto()
+    {
+        Debug.Log("Good " + contador);
         contador++;
 
         audioSource.clip = soundClip2;
         audioSource.Play();
     }
-
-
-
-    void OnDestroy() {
-    if (_serialPort != null && _serialPort.IsOpen) {
-        _serialPort.Close();
-        Debug.Log("Serial port closed in OnDestroy.");
+    void OnDestroy()
+    {
+        if (_serialPort != null && _serialPort.IsOpen)
+        {
+            _serialPort.Close();
+            Debug.Log("Serial port closed in OnDestroy.");
+        }
     }
-}
 
-void OnApplicationQuit() {
-    if (_serialPort != null && _serialPort.IsOpen) {
-        _serialPort.Close();
-        Debug.Log("Serial port closed in OnApplicationQuit.");
+    void OnApplicationQuit()
+    {
+        if (_serialPort != null && _serialPort.IsOpen)
+        {
+            _serialPort.Close();
+            Debug.Log("Serial port closed in OnApplicationQuit.");
+        }
     }
-}
-
-
 }
